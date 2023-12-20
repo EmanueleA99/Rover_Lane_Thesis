@@ -1,0 +1,5 @@
+/rover/lane_sub:
+  ros__parameters:
+    proportional_kc: 0.1
+    linear_velocity: 0.0
+    transport: compressed

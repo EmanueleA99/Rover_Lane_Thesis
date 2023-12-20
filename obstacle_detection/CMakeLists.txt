@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(rover_lane)
+project(obstacle_detection)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -7,14 +7,6 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(std_msgs REQUIRED)
-find_package(sensor_msgs REQUIRED)
-find_package(cv_bridge REQUIRED)
-find_package(image_transport REQUIRED)
-find_package(OpenCV REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(std_srvs REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -31,22 +23,47 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-# Install launch files.
-install(DIRECTORY
-  launch
-  DESTINATION share/${PROJECT_NAME}/
+# dependencies
+find_package(ament_cmake_auto REQUIRED)
+ament_auto_find_build_dependencies()
+
+find_package(rclcpp REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(cv_bridge REQUIRED)
+find_package(OpenCV REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(image_transport REQUIRED)
+
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  ament_lint_auto_find_test_dependencies()
+endif()
+
+# includes
+include_directories(
+    ${rclcpp_INCLUDE_DIRS}
+    ${sensor_msgs_INCLUDE_DIRS}
+)
+
+## Build
+add_executable(obstacle src/obstacle.cpp)
+ament_target_dependencies(obstacle
+  rclcpp
+  sensor_msgs
+  cv_bridge
+  OpenCV
+  std_msgs
+  image_transport
 )
 
 
-install(DIRECTORY config
-  DESTINATION share/${PROJECT_NAME})
 
-add_executable(lane_sub src/rover_lane_sub.cpp)
-ament_target_dependencies(lane_sub rclcpp std_msgs sensor_msgs cv_bridge image_transport OpenCV geometry_msgs std_srvs)
+# Install executable
+install(
+    TARGETS obstacle
+    DESTINATION lib/${PROJECT_NAME}
+)
 
-install(TARGETS
-   lane_sub
-   DESTINATION lib/${PROJECT_NAME}
- )
+
 
 ament_package()
