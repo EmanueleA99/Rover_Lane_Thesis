@@ -219,21 +219,32 @@ class LaneSubscriber : public rclcpp::Node
 
             cv::String windowName = "Lane"; //Name of the window
 
-            cv::Mat gray_image;
-            cvtColor(image, gray_image, CV_BGR2GRAY );
+            // apply image blurring
+            cv::Mat image_blurred;
+            cv::GaussianBlur(image, image_blurred, cv::Size(81, 81), 0);
+
+            // Converti l'immagine in HSV
+            cv::Mat hsvImage;
+            cv::cvtColor(image_blurred, hsvImage, cv::COLOR_BGR2HSV);
+
+            // Definisci il range per il verde in HSV
+            cv::Scalar lowerGreen = cv::Scalar(35, 80, 40); // Valori del lower bound per il verde in HSV
+            cv::Scalar upperGreen = cv::Scalar(90, 255, 255); // Valori del upper bound per il verde in HSV
+
+            // Crea una maschera per il verde
+            cv::Mat greenMask;
+            cv::inRange(hsvImage, lowerGreen, upperGreen, greenMask);
+            
+            cv::Mat resultImage = image.clone();
+            resultImage.setTo(cv::Scalar(255, 255, 255), greenMask);
 
             // apply image thresholding
             cv::Mat image_thresh;
-            threshold(gray_image, image_thresh, 115, 255, cv::THRESH_BINARY); 
-
-            // apply image blurring
-            cv::Mat image_blurred;
-            cv::GaussianBlur(image_thresh, image_blurred, cv::Size(13, 13), 0);
+            threshold(resultImage, image_thresh, 150, 255, cv::THRESH_BINARY); 
 
             // apply image Canny
             cv::Mat image_canny;
-            cv::Canny(image_blurred, image_canny, 80, 150, 5, true);
-
+            cv::Canny(resultImage, image_canny, 400, 500, 7, false);
 
             int height = image.rows;
             int width = image.cols;
@@ -243,9 +254,9 @@ class LaneSubscriber : public rclcpp::Node
 
             // add all points of the contour to the vector
             vector<cv::Point> vertices{cv::Point(0, height), 
-                                    cv::Point(0, (int)height*0.7), 
-                                    cv::Point((int)width/2, (int)height*0.55),
-                                    cv::Point(width, (int)height*0.7), 
+                                    cv::Point(0, (int)height*0.5), 
+                                    cv::Point((int)width/2, (int)height*0.35),
+                                    cv::Point(width, (int)height*0.5), 
                                     cv::Point(width, height)};
 
             vector<vector<cv::Point>> pts{vertices};
@@ -254,10 +265,14 @@ class LaneSubscriber : public rclcpp::Node
             cv::Mat image_isolated;
             cv::bitwise_and(image_canny, image_mask, image_isolated);
 
-            imshow(windowName, image_isolated);
             // extract all the lines
+
+            // Mostra o salva l'immagine risultante
+            cv::imshow("Result Image",image_isolated);
+            cv::waitKey(1); 
+
             vector<cv::Vec4i> lines;
-            cv::HoughLinesP(image_isolated, lines, 2, CV_PI/180, 80, 60, 5);
+            cv::HoughLinesP(image_isolated, lines, 2, CV_PI/180, 100, 100, 5);
 
             // average slope, y_int of left and right line
             vector<float> lines_avg;

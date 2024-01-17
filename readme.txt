@@ -24,7 +24,7 @@ Terminale 2 : eseguire “ros2 service call /image_processing_pipeline/usb_camer
 Terminale 3 eseguire : ros2 service call /image_processing_pipeline/aruco_detector/enable std_srvs/srv/SetBool "{data: True}" 
 
 
-For launch node lane_sub in real world change in lane_sub.cpp on line 62:
+For launch node lane_sub in real world change in rover_lane_sub.cpp on line 48:
 topic -- "/car1/usb_camera_driver/camera/image_rect_color" for real Use
 topic -- "video_frames" for demo with webcam_pub publisher
 
