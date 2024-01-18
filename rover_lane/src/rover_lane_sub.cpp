@@ -90,8 +90,8 @@ class LaneSubscriber : public rclcpp::Node
             cv::line(image, cv::Point (x1,y1), cv::Point (x2,y2), cv::Scalar(255,0,0), 10);
         }
 
-        cv::line(image, cv::Point ((int)width/2 - offset,0), cv::Point ((int)width/2 - offset,480), cv::Scalar(0,0,255), 3, 8, 0);
-        cv::line(image, cv::Point ((int)width/2 + offset,0), cv::Point ((int)width/2 + offset,480), cv::Scalar(0,0,255), 3, 8, 0);
+        cv::line(image, cv::Point ((int)width/2 - offset,0), cv::Point ((int)width/2 - offset,height), cv::Scalar(0,0,255), 3, 8, 0);
+        cv::line(image, cv::Point ((int)width/2 + offset,0), cv::Point ((int)width/2 + offset,height), cv::Scalar(0,0,255), 3, 8, 0);
 
         std::vector<int> result = intersection(lines_avg, image);
         int x = result[0];
@@ -122,6 +122,7 @@ class LaneSubscriber : public rclcpp::Node
 
     std::vector<int> intersection(vector<float> lines_avg, cv::Mat image)
     {
+        int height = image.rows;
         float m1 = lines_avg[0];
         float q1 = lines_avg[1];
         float m2 = lines_avg[2];
@@ -130,7 +131,14 @@ class LaneSubscriber : public rclcpp::Node
         int x = (int) (q2 - q1) / (m1 - m2);
         int y = (int) (m1*x) + q1;
 
-        cv::circle(image, cv::Point(x, y), 5, cv::Scalar(0, 0, 255), 10);
+        //filtro degli x 
+        const double alpha = 0.15;  // Peso del valore corrente
+        if (previous_x_ != 0){
+        x = (int) (alpha * x + (1 - alpha) * previous_x_);
+        }
+        previous_x_ = x;
+
+        cv::circle(image, cv::Point(x,height/2), 5, cv::Scalar(0, 0, 255), 10);
         std::vector<int> xy = {x,y};
         return xy;
     }
@@ -203,6 +211,28 @@ class LaneSubscriber : public rclcpp::Node
         float slope_left_avg = slope_sum / left_lines.size();
         float y_int_left_avg = y_int_sum / left_lines.size();
 
+        //Filtraggio
+        const double alpha = 0.15;  // Peso del valore corrente
+
+        if (previous_slope_left_avg!= 0){
+        slope_left_avg = (float) (alpha * slope_left_avg + (1 - alpha) * previous_slope_left_avg);
+        }
+        previous_slope_left_avg = slope_left_avg;
+
+        if (previous_slope_right_avg!= 0){
+        slope_right_avg = (float) (alpha * slope_right_avg + (1 - alpha) * previous_slope_right_avg);
+        }
+        previous_slope_right_avg = slope_right_avg;
+
+        if (previous_y_int_left_avg!= 0){
+        y_int_left_avg = (float) (alpha * y_int_left_avg + (1 - alpha) * previous_y_int_left_avg);
+        }
+        previous_y_int_left_avg = y_int_left_avg;
+
+        if (previous_y_int_right_avg!= 0){
+        y_int_right_avg = (float) (alpha * y_int_right_avg + (1 - alpha) * previous_y_int_right_avg);
+        }
+        previous_y_int_right_avg = y_int_right_avg;
 
         std::vector<float> lines_avg = {slope_left_avg, y_int_left_avg, slope_right_avg, y_int_right_avg};
 
@@ -211,6 +241,11 @@ class LaneSubscriber : public rclcpp::Node
 
      private:
 
+        int previous_x_;
+        float previous_slope_left_avg;
+        float previous_slope_right_avg;
+        float previous_y_int_left_avg;
+        float previous_y_int_right_avg;
         image_transport::Subscriber lane_sub_;
 
         void callback(const Image::ConstSharedPtr & msg) 
