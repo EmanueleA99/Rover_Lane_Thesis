@@ -29,6 +29,8 @@ class LaneSubscriber : public rclcpp::Node
             // parameters
             this->declare_parameter("proportional_kc", 0.10);
             this->declare_parameter("linear_velocity", 0.0);
+            this->declare_parameter("filter_parameter", 0.25);
+            this->declare_parameter("dead_zone", 2.5);
 
             enable_server_ = this->create_service<SetBool>("~/enable",std::bind(&LaneSubscriber::enable_callback,this,
             std::placeholders::_1,
@@ -71,21 +73,23 @@ class LaneSubscriber : public rclcpp::Node
         float slope, y_int;
         int x1, x2, y1, y2;
 
-        offset = (int) width / 100 * 2.5;
+        //steering wheel deadzone parameter
+        double dead_zone = this->get_parameter("dead_zone").as_double();
+        offset = (int) width / 100 * dead_zone;
 
         for (i=0; i<2; i++)
         {
             slope = lines_avg[0+2*i];
             y_int = lines_avg[1+2*i];
 
-            std::cout << slope << " " << y_int << endl;
+            //std::cout << slope << " " << y_int << endl;
 
             y1 = height;
             y2 = (int) (y1 * (float)3/5);
             x1 = (int) ((y1 - y_int) / slope);
             x2 = (int) ((y2 - y_int) / slope);
 
-            std::cout << x1 << " " << x2 << " " << y1 << " " << y2 << endl;
+            //std::cout << x1 << " " << x2 << " " << y1 << " " << y2 << endl;
 
             cv::line(image, cv::Point (x1,y1), cv::Point (x2,y2), cv::Scalar(255,0,0), 10);
         }
@@ -106,14 +110,20 @@ class LaneSubscriber : public rclcpp::Node
         double velocity = this->get_parameter("linear_velocity").as_double();
 
         // Zona morta del volante
+        if(x == 0){
+            std::cout << "Lane not available" << std::endl;
+            double steering_angle = 0.0; //no steering correction
+            std::vector<double> law = {velocity, steering_angle};
+            return law;
+        }
         if (x > (width / 2 - offset) && x < (width / 2 + offset)) {
             std::cout << "Dritto" << std::endl;
-            double steering_angle = 0.0;
+            double steering_angle = 0.0; //no steering correction
             std::vector<double> law = {velocity, steering_angle};
         return law;
         } else {
             double new_x = x - width / 2; // Sposta il valore zero al centro dello schermo
-            double steering_angle = kc * new_x;
+            double steering_angle = kc * new_x; //steering correction
             std::cout << steering_angle << std::endl;
             std::vector<double> law = {velocity, steering_angle};
         return law;
@@ -128,12 +138,19 @@ class LaneSubscriber : public rclcpp::Node
         float m2 = lines_avg[2];
         float q2 = lines_avg[3];
 
-        int x = (int) (q2 - q1) / (m1 - m2);
-        int y = (int) (m1*x) + q1;
+        int x;
+        int y;
+        if(!std::isnan(m1) && !std::isnan(q1) && !std::isnan(m2) && !std::isnan(q2)){
+            x = (int) (q2 - q1) / (m1 - m2);
+            y = (int) (m1*x) + q1;
+        }else{
+            x = 0;
+            previous_x_ = 0;
+        }
 
         //filtro degli x 
-        const double alpha = 0.15;  // Peso del valore corrente
-        if (previous_x_ != 0){
+        const double alpha = this->get_parameter("filter_parameter").as_double();  // Peso del valore corrente
+        if (previous_x_ != 0 && !std::isnan(previous_x_) && x!=0){
         x = (int) (alpha * x + (1 - alpha) * previous_x_);
         }
         previous_x_ = x;
@@ -147,6 +164,7 @@ class LaneSubscriber : public rclcpp::Node
     {
         int x1, y1, x2, y2, i;
         float slope, y_int, slope_sum, y_int_sum;
+        
 
         std::vector<std::vector<float>>  right_lines, left_lines;
         std::vector<float> temp_vect;
@@ -212,24 +230,24 @@ class LaneSubscriber : public rclcpp::Node
         float y_int_left_avg = y_int_sum / left_lines.size();
 
         //Filtraggio
-        const double alpha = 0.15;  // Peso del valore corrente
+        const double alpha = this->get_parameter("filter_parameter").as_double();  // Peso del valore corrente
 
-        if (previous_slope_left_avg!= 0){
+        if (previous_slope_left_avg!= 0 && !std::isnan(previous_slope_left_avg)){
         slope_left_avg = (float) (alpha * slope_left_avg + (1 - alpha) * previous_slope_left_avg);
         }
         previous_slope_left_avg = slope_left_avg;
 
-        if (previous_slope_right_avg!= 0){
+        if (previous_slope_right_avg!= 0 && !std::isnan(previous_slope_right_avg)){
         slope_right_avg = (float) (alpha * slope_right_avg + (1 - alpha) * previous_slope_right_avg);
         }
         previous_slope_right_avg = slope_right_avg;
 
-        if (previous_y_int_left_avg!= 0){
+        if (previous_y_int_left_avg!= 0 && !std::isnan(previous_y_int_left_avg)){
         y_int_left_avg = (float) (alpha * y_int_left_avg + (1 - alpha) * previous_y_int_left_avg);
         }
         previous_y_int_left_avg = y_int_left_avg;
 
-        if (previous_y_int_right_avg!= 0){
+        if (previous_y_int_right_avg!= 0 && !std::isnan(previous_y_int_right_avg)){
         y_int_right_avg = (float) (alpha * y_int_right_avg + (1 - alpha) * previous_y_int_right_avg);
         }
         previous_y_int_right_avg = y_int_right_avg;
