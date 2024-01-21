@@ -15,8 +15,8 @@ public:
     
     // https://github.com/ros2/ros2/wiki/About-Quality-of-Service-Settings
 
-    rclcpp::QoS depth_qos(10);
-    depth_qos.keep_last(10);
+    rclcpp::QoS depth_qos(1);
+    depth_qos.keep_last(1);
     depth_qos.best_effort();
     depth_qos.durability_volatile();
 
@@ -24,8 +24,8 @@ public:
     mDepthSub = create_subscription<sensor_msgs::msg::Image>(
       "/camera/aligned_depth_to_color/image_raw", depth_qos, std::bind(&MinimalDepthSubscriber::depthCallback, this, _1));
 
-    //mConfidenceSub = create_subscription<sensor_msgs::msg::Image>(
-    //  "/camera/confidence/image_rect_raw", depth_qos, std::bind(&MinimalDepthSubscriber::depthCallback, this, _1));
+    this->declare_parameter("Obstacle_threshold", 1500.0);
+
   }
 
 protected:
@@ -56,33 +56,30 @@ protected:
     // Calcolo la media dei valori di profondità nella zona di interesse
     double meanDepth = cv::mean(roi,nonZeroMask)[0];
 
-    //Prendo il valore depth del pixel in posizione x,y - prima passo y e poi x
-    //uint16_t depthValue = cv_ptr->image.at<uint16_t>((y/2), (x/2));
-
     // Grafico il rettangolo di interesse sulla copia dell'immagine
     cv::Mat imageWithROI = cv_ptr->image.clone();
     cv::rectangle(imageWithROI, cv::Rect(roiX, roiY, roiSize, roiSize), cv::Scalar(0, 255, 0), 2);
 
     // Mostro l'immagine con il rettangolo di interesse
-    cv::namedWindow(OPENCV_WINDOW);
-    cv::imshow(OPENCV_WINDOW, imageWithROI);
-    cv::waitKey(3);
+    //cv::namedWindow(OPENCV_WINDOW);
+    //cv::imshow(OPENCV_WINDOW, imageWithROI);
+    //cv::waitKey(1);
 
     // Output the measure
     //std::cout << "Valore di profondità al pixel (" << x << ", " << y << "): " << depthValue << std::endl;
     // Output della media dei valori di profondità nella zona di interesse
     std::cout << "Media dei valori di profondità nella zona di interesse: " << meanDepth << std::endl;
     
-    // Verifica se la distanza media è inferiore a 500 e stampa il messaggio appropriato
-    if (meanDepth < 1500.0) {
+    // Verifica se la distanza media è inferiore a "param" e stampa il messaggio appropriato
+    double obstacle_threshold = this->get_parameter("Obstacle_threshold").as_double();
+
+    if (meanDepth < obstacle_threshold) {
         std::cout << "OBSTACLE DETECTED" << std::endl;
     }
-
   }
 
 private:
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr mDepthSub;
-  //rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr mConfidenceSub;
 };
 
 // The main function

@@ -1,3 +1,7 @@
+// Emanuele Arilli - Master's Thesis //
+// emanuelearilli@gmail.com          //
+// January 2024                      //
+
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "std_msgs/msg/header.hpp"
@@ -94,23 +98,25 @@ class LaneSubscriber : public rclcpp::Node
             cv::line(image, cv::Point (x1,y1), cv::Point (x2,y2), cv::Scalar(255,0,0), 10);
         }
 
+        //Deadzone Lines
         cv::line(image, cv::Point ((int)width/2 - offset,0), cv::Point ((int)width/2 - offset,height), cv::Scalar(0,0,255), 3, 8, 0);
         cv::line(image, cv::Point ((int)width/2 + offset,0), cv::Point ((int)width/2 + offset,height), cv::Scalar(0,0,255), 3, 8, 0);
 
         std::vector<int> result = intersection(lines_avg, image);
         int x = result[0];
-
-        std::vector<double> control_result = control_law(x,offset,width); //call the control law for lane keeping
+        
+        //call the control law for lane keeping
+        std::vector<double> control_result = control_law(x,offset,width);
         return control_result;
     }
 
     std::vector<double> control_law(double x, double offset, double width) {
-        // Applica una legge di controllo proporzionale per il mantenimento della corsia
+        
+        //Proportional Control Law for lane keeping
         double kc = this->get_parameter("proportional_kc").as_double();
         double velocity = this->get_parameter("linear_velocity").as_double();
 
-        // Zona morta del volante
-        if(x == 0){
+        if(x == 0){ //Lane not detected case
             std::cout << "Lane not available" << std::endl;
             double steering_angle = 0.0; //no steering correction
             std::vector<double> law = {velocity, steering_angle};
@@ -122,7 +128,7 @@ class LaneSubscriber : public rclcpp::Node
             std::vector<double> law = {velocity, steering_angle};
         return law;
         } else {
-            double new_x = x - width / 2; // Sposta il valore zero al centro dello schermo
+            double new_x = x - width / 2; // Set new zero to the center of the screen
             double steering_angle = kc * new_x; //steering correction
             std::cout << steering_angle << std::endl;
             std::vector<double> law = {velocity, steering_angle};
@@ -140,21 +146,23 @@ class LaneSubscriber : public rclcpp::Node
 
         int x;
         int y;
+        //Check if lane is detected
         if(!std::isnan(m1) && !std::isnan(q1) && !std::isnan(m2) && !std::isnan(q2)){
             x = (int) (q2 - q1) / (m1 - m2);
             y = (int) (m1*x) + q1;
-        }else{
+        }else{ //lane not detected
             x = 0;
             previous_x_ = 0;
         }
 
-        //filtro degli x 
+        //x filter
         const double alpha = this->get_parameter("filter_parameter").as_double();  // Peso del valore corrente
         if (previous_x_ != 0 && !std::isnan(previous_x_) && x!=0){
         x = (int) (alpha * x + (1 - alpha) * previous_x_);
         }
         previous_x_ = x;
 
+        //Print on image red dot x value
         cv::circle(image, cv::Point(x,height/2), 5, cv::Scalar(0, 0, 255), 10);
         std::vector<int> xy = {x,y};
         return xy;
@@ -165,7 +173,6 @@ class LaneSubscriber : public rclcpp::Node
         int x1, y1, x2, y2, i;
         float slope, y_int, slope_sum, y_int_sum;
         
-
         std::vector<std::vector<float>>  right_lines, left_lines;
         std::vector<float> temp_vect;
 
@@ -176,7 +183,6 @@ class LaneSubscriber : public rclcpp::Node
             x2 = lines[i][2];
             y2 = lines[i][3];
         
-
             //fit line
             if ((x2 - x1) != 0)
             {
@@ -191,9 +197,7 @@ class LaneSubscriber : public rclcpp::Node
 
             std::vector<float> temp_vect = {slope, y_int};
 
-
             //std::cout << slope << " " << y_int << endl;
-
 
             if (slope < 0)
             {
@@ -203,7 +207,6 @@ class LaneSubscriber : public rclcpp::Node
                 right_lines.push_back(temp_vect);
             }
         }
-
 
         slope_sum = 0;
         y_int_sum = 0;
@@ -229,7 +232,7 @@ class LaneSubscriber : public rclcpp::Node
         float slope_left_avg = slope_sum / left_lines.size();
         float y_int_left_avg = y_int_sum / left_lines.size();
 
-        //Filtraggio
+        //Filtering lines
         const double alpha = this->get_parameter("filter_parameter").as_double();  // Peso del valore corrente
 
         if (previous_slope_left_avg!= 0 && !std::isnan(previous_slope_left_avg)){
@@ -268,6 +271,7 @@ class LaneSubscriber : public rclcpp::Node
 
         void callback(const Image::ConstSharedPtr & msg) 
         {   
+            //Image frame from topic
             cv::Mat image(msg->height, msg->width, CV_8UC3, (void *)(msg->data.data()));
 
             cv::String windowName = "Lane"; //Name of the window
@@ -276,22 +280,23 @@ class LaneSubscriber : public rclcpp::Node
             cv::Mat image_blurred;
             cv::GaussianBlur(image, image_blurred, cv::Size(81, 81), 0);
 
-            // Converti l'immagine in HSV
+            // Convert image in HSV format
             cv::Mat hsvImage;
             cv::cvtColor(image_blurred, hsvImage, cv::COLOR_BGR2HSV);
 
-            // Definisci il range per il verde in HSV
-            cv::Scalar lowerGreen = cv::Scalar(35, 80, 40); // Valori del lower bound per il verde in HSV
-            cv::Scalar upperGreen = cv::Scalar(90, 255, 255); // Valori del upper bound per il verde in HSV
+            // Green range for HSV format
+            cv::Scalar lowerGreen = cv::Scalar(35, 80, 40); // Green lower bound HSV
+            cv::Scalar upperGreen = cv::Scalar(90, 255, 255); // Green upper bound HSV
 
-            // Crea una maschera per il verde
+            // Create a mask for green
             cv::Mat greenMask;
             cv::inRange(hsvImage, lowerGreen, upperGreen, greenMask);
             
+            //Set White pixel for all green pixel
             cv::Mat resultImage = image.clone();
             resultImage.setTo(cv::Scalar(255, 255, 255), greenMask);
 
-            // apply image thresholding
+            // apply image thresholding - Make a black&white image
             cv::Mat image_thresh;
             threshold(resultImage, image_thresh, 150, 255, cv::THRESH_BINARY); 
 
@@ -299,6 +304,7 @@ class LaneSubscriber : public rclcpp::Node
             cv::Mat image_canny;
             cv::Canny(resultImage, image_canny, 400, 500, 7, false);
 
+            //Create mask for the region of interest for lane keeping
             int height = image.rows;
             int width = image.cols;
             cv::Mat image_mask;
@@ -320,7 +326,7 @@ class LaneSubscriber : public rclcpp::Node
 
             // extract all the lines
 
-            // Mostra o salva l'immagine risultante
+            // Show on windows the result image
             cv::imshow("Result Image",image_isolated);
             cv::waitKey(1); 
 
@@ -335,7 +341,7 @@ class LaneSubscriber : public rclcpp::Node
 
             auto twist_msg  = geometry_msgs::msg::TwistStamped();
             twist_msg.twist.angular.z = control_result[1];
-            twist_msg.header.frame_id = "car1/base_footprint";
+            twist_msg.header.frame_id = "rover/base_footprint";
 
             //Publish control message
             ctrl_publisher_->publish(twist_msg);
