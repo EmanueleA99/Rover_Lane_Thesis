@@ -51,7 +51,7 @@ class LaneSubscriber : public rclcpp::Node
         {
         if (req->data) {
             if (!is_on_) {
-            lane_sub_ = image_transport::create_subscription(this, "video_frames", std::bind(&LaneSubscriber::callback, this, std::placeholders::_1), "raw");
+            lane_sub_ = image_transport::create_subscription(this, "/camera/camera/color/image_raw", std::bind(&LaneSubscriber::callback, this, std::placeholders::_1), "raw");
             is_on_ = true;
             RCLCPP_WARN(this->get_logger(), "Detector ACTIVATED");
             }
@@ -327,8 +327,8 @@ class LaneSubscriber : public rclcpp::Node
             // extract all the lines
 
             // Show on windows the result image
-            cv::imshow("Result Image",image_isolated);
-            cv::waitKey(1); 
+            //cv::imshow("Result Image",image_isolated);
+            //cv::waitKey(1); 
 
             vector<cv::Vec4i> lines;
             cv::HoughLinesP(image_isolated, lines, 2, CV_PI/180, 100, 100, 5);
@@ -346,9 +346,9 @@ class LaneSubscriber : public rclcpp::Node
             //Publish control message
             ctrl_publisher_->publish(twist_msg);
 
-            cv::namedWindow(windowName); // Create a window
-            imshow(windowName, image); // Show our image inside the created window.
-            cv::waitKey(1); // Wait for any keystroke in the window
+            //cv::namedWindow(windowName); // Create a window
+            //imshow(windowName, image); // Show our image inside the created window.
+            //cv::waitKey(1); // Wait for any keystroke in the window
     
         }
         rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr ctrl_publisher_;

@@ -27,7 +27,7 @@ public:
 
     // Create depth map subscriber
     mDepthSub = create_subscription<sensor_msgs::msg::Image>(
-      "/camera/aligned_depth_to_color/image_raw", depth_qos, std::bind(&MinimalDepthSubscriber::depthCallback, this, _1));
+      "/camera/camera/aligned_depth_to_color/image_raw", depth_qos, std::bind(&MinimalDepthSubscriber::depthCallback, this, _1));
 
     //Publisher for topic "rover/obstacle"
     mObstaclePub = create_publisher<std_msgs::msg::Bool>("rover/obstacle", 10);
@@ -71,9 +71,9 @@ protected:
     cv::rectangle(imageWithROI, cv::Rect(roiX, roiY, roiSize, roiSize), cv::Scalar(0, 255, 0), 2);
 
     // Show the image - comment this section for fast code
-    cv::namedWindow(OPENCV_WINDOW);
-    cv::imshow(OPENCV_WINDOW, imageWithROI);
-    cv::waitKey(1);
+    //cv::namedWindow(OPENCV_WINDOW);
+    //cv::imshow(OPENCV_WINDOW, imageWithROI);
+    //cv::waitKey(1);
 
     // Output mean depth in the region of interest
     std::cout << "Media dei valori di profondità nella zona di interesse: " << meanDepth << std::endl;
